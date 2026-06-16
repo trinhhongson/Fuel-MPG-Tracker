@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Car, Fuel, Plus, Trash2, Edit2, Activity, Calendar, Hash, DollarSign, Sparkles, Wrench, TrendingUp, Loader2, Upload, Download, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 // --- YOUR Firebase Setup ---
@@ -20,6 +20,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -55,18 +56,37 @@ export default function App() {
   });
 
   // --- Initialize Authentication ---
+  // Listen for login state changes
   useEffect(() => {
-    signInAnonymously(auth).catch((error) => {
-      console.error("Auth failed! Did you enable Anonymous Sign-in in Firebase?", error);
-    });
-    
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        setUser(currentUser);
+        // Your existing data fetching logic goes here!
+      } else {
+        setUser(null);
+      }
       setDbLoading(false);
     });
-    
     return () => unsubscribe();
   }, []);
+
+  // Google Login Function
+  const handleGoogleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Error signing in:", error);
+    }
+  };
+
+  // Sign Out Function
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   // --- Fetch Data from Firestore ---
   useEffect(() => {
@@ -439,6 +459,33 @@ export default function App() {
     return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="inline ml-1" /> : <ChevronDown size={14} className="inline ml-1" />;
   };
 
+  // If the user is NOT logged in, show the Landing Page
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center shadow-xl">
+          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-4">
+            Fuel & MPG Tracker
+          </h1>
+          <p className="text-slate-400 mb-8">
+            Log your fill-ups, track fuel efficiency, and manage your garage across all your devices.
+          </p>
+          <button
+            onClick={handleGoogleSignIn}
+            className="w-full flex items-center justify-center gap-3 bg-white text-slate-900 py-3 px-4 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+          >
+            <img 
+              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+              alt="Google logo" 
+              className="w-6 h-6"
+            />
+            Sign in with Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-4 md:p-8 relative">
       
@@ -513,6 +560,12 @@ export default function App() {
             </div>
           </div>
           
+          <button 
+            onClick={handleSignOut}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold rounded-lg border border-slate-600 transition-colors"
+          >
+            Sign Out
+          </button>
         </header>
 
         {/* Top Cards Row */}
